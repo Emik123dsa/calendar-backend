@@ -1,0 +1,115 @@
+FROM php:8.0.6-fpm-buster as PHP-FPM-BUSTER-BUILD
+
+LABEL maintainer="scheduler-web"
+
+USER root
+
+ENV PHING_INSTALLER "https://www.phing.info/get/phing-latest.phar"
+ENV COMPOSER_INSTALLER "https://getcomposer.org/installer"
+ENV PHPUNIT_INSTALLER "https://phar.phpunit.de/phpunit.phar"
+ENV PICKLE_INSTALLER "https://github.com/FriendsOfPHP/pickle/releases/download/v0.6.0/pickle.phar"
+
+ENV LARAVEL_ENV "dev"
+
+ADD ${PHING_INSTALLER} /usr/local/bin/phing 
+RUN chmod +x /usr/local/bin/phing && \
+    chown -R www-data:www-data /usr/local/bin/phing
+
+RUN curl -sS ${COMPOSER_INSTALLER} | php && \
+    mv composer.phar /usr/local/bin/composer && \
+    chmod a+x /usr/local/bin/composer && \
+    chown -R www-data:www-data /usr/local/bin/composer
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && \
+    apt-get upgrade -y && \
+    apt-get autoremove --purge -y && \
+    apt-get install -y vim \
+    wget \
+    git \
+    zip \
+    libonig-dev \
+    libpq-dev \
+    libzip-dev \
+    autoconf \
+	build-essential \
+	libssl-dev \
+	libxml2-dev \
+	wget \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libmemcached-dev \
+    zlib1g-dev \
+    libevent-dev && \
+    apt-get clean all -y
+
+RUN docker-php-ext-install zip pcntl
+
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
+    docker-php-ext-install -j$(nproc) gd
+
+RUN docker-php-ext-configure pgsql --with-pgsql=/usr/include/postgresql/ && \
+    docker-php-ext-install -j$(nproc) pgsql
+
+RUN curl -sS ${PHPUNIT_INSTALLER} -o /usr/local/bin/phpunit && \
+    chmod a+x /usr/local/bin/phpunit && \
+    chown -R www-data:www-data /usr/local/bin/phpunit
+
+RUN curl -L -o /usr/local/bin/pickle ${PICKLE_INSTALLER} && \
+    chmod a+x /usr/local/bin/pickle && \
+    chown www-data:www-data /usr/local/bin/pickle
+
+RUN docker-php-ext-install -j$(nproc) sockets \
+    mbstring \
+    mysqli \
+    pdo \
+    pdo_mysql \
+    pdo_pgsql \
+    shmop \
+    bcmath
+
+# Enable xdebug for development;
+RUN pecl install xdebug
+RUN docker-php-ext-enable xdebug
+
+RUN pecl install apcu && \
+    pecl install memcached && \
+    pecl install redis
+
+RUN docker-php-ext-enable \
+    apcu \
+    memcached \
+    redis \
+    pcntl
+
+RUN echo "memory_limit=-1" | tee -a /usr/local/etc/php/php.ini
+
+RUN echo "pm.max_children=25" | tee -a /usr/local/etc/php-fpm.d/www.conf
+RUN echo "pm.start_servers=5" | tee -a /usr/local/etc/php-fpm.d/www.conf
+RUN echo "pm.min_spare_servers=5" | tee -a /usr/local/etc/php-fpm.d/www.conf
+RUN echo "pm.max_spare_servers=25" | tee -a /usr/local/etc/php-fpm.d/www.conf
+
+ADD docker/dev/php-fpm/*.ini /usr/local/etc/php/conf.d/
+
+RUN touch /tmp/xdebug.log
+RUN chmod a+rwx /tmp/xdebug.log
+
+ENV COMPOSER_ALLOW_SUPERUSER "1"
+ENV COMPOSER_HOME "/usr/local/bin/composer"
+ENV COMPOSER_VERSION "2.0.12"
+
+RUN mkdir -p /var/www/
+RUN chown -R www-data:www-data /var/www/
+RUN chmod a+rwx /var/www/
+RUN usermod --non-unique -uid 1000 www-data
+
+WORKDIR /var/www/
+
+USER www-data
+
+EXPOSE 9000
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["php-fpm"]

@@ -1,6 +1,70 @@
 version: "3.7"
 
 services:
+  php-fpm:
+    container_name: "scheduler-php-fpm"
+    image: "scheduler-php-fpm"
+    tty: true
+    build:
+      context: .
+      dockerfile: Dockerfile.php-fpm
+    working_dir: /var/www/
+    depends_on:
+      - database
+    volumes:
+      - ".:/var/www/"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "scheduler-php-fpm-local:/var/lib/php/"
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - scheduler-network
+  nginx:
+    container_name: "scheduler-nginx"
+    tty: true
+    image: "scheduler-nginx"
+    working_dir: /var/www/
+    depends_on: 
+      - php-fpm
+      - database
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ".:/var/www/"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "scheduler-nginx-local:/var/lib/nginx/"
+    expose:
+      - 80
+      - 443
+    networks:
+      - scheduler-network
+  elasticsearch:
+    container_name: "scheduler-elasticsearch"
+    image: elasticsearch:${ELK_VERSION}
+    tty: true
+    restart: unless-stopped
+    ports: 
+      - 9200:9200
+      - 9300:9300
+    env_file: 
+      - .env
+    environment: 
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      ELASTIC_PASSWORD: ${ELK_PASSWORD}
+      discovery.type: single-node
+    expose: 
+      - 9200
+      - 9300
+    networks: 
+      - scheduler-network
   database:
     container_name: "scheduler-database"
     image: mysql:latest
@@ -11,28 +75,36 @@ services:
         soft: 262144
         hard: 262144
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD}"]
+      timeout: 20s
+      retries: 10
     environment:
-        MYSQL_DATABASE: ${MYSQL_DATABASE}
-        MYSQL_USER: ${MYSQL_USER}
-        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-        MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-        MYSQL_ALLOW_EMPTY_PASSWORD: ${MYSQL_ALLOW_EMPTY_PASSWORD}  
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ALLOW_EMPTY_PASSWORD: ${MYSQL_ALLOW_EMPTY_PASSWORD}
     env_file:
-        - .env
+      - .env
     ports:
-        - 3306:3306
+      - 3306:3306
     expose:
-        - 3306
+      - 3306
     volumes:
-        - "/var/run/docker.sock:/var/run/docker.sock"
-        - "scheduler-database-local:/var/lib/mysql"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "scheduler-database-local:/var/lib/mysql/"
     networks:
-        - scheduler-network
-#   elasticsearch:
+      - scheduler-network
+  # elasticsearch:
 
-volumes: 
-    scheduler-database-local:
-        driver: local
+volumes:
+  scheduler-database-local:
+    driver: local
+  scheduler-php-fpm-local:
+    driver: local
+  scheduler-nginx-local:
+    driver: local
 
 networks:
   scheduler-network:

@@ -1,0 +1,20 @@
+FROM nginx:latest as NGINX-LATEST
+
+LABEL maintainer = "scheduler-nginx"
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && \
+    apt-get upgrade -y && \
+    apt-get autoremove --purge -y && \
+    apt-get install -y vim && \
+    apt-get clean all
+
+RUN rm -f /etc/nginx/conf.d/*.conf
+
+ADD docker/dev/web/*.conf /etc/nginx/conf.d
+
+EXPOSE 80
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
