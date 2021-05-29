@@ -1,10 +1,12 @@
-version: "3.7"
+version: "3.8"
 
 services:
   php-fpm:
     container_name: "scheduler-php-fpm"
     image: "scheduler-php-fpm"
     tty: true
+    expose:
+      - 9000
     build:
       context: .
       dockerfile: Dockerfile.php-fpm
@@ -13,9 +15,7 @@ services:
       - database
     volumes:
       - ".:/var/www/"
-    volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "scheduler-php-fpm-local:/var/lib/php/"
     env_file:
       - .env
     restart: unless-stopped
