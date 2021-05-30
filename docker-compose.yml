@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   php-fpm:
-    container_name: "scheduler-php-fpm"
-    image: "scheduler-php-fpm"
+    container_name: "calendar-php-fpm"
+    image: "calendar-php-fpm"
     tty: true
     expose:
       - 9000
@@ -33,11 +33,11 @@ services:
       - .env
     restart: unless-stopped
     networks:
-      - scheduler-network
+      - calendar-network
   nginx:
-    container_name: "scheduler-nginx"
+    container_name: "calendar-nginx"
     tty: true
-    image: "scheduler-nginx"
+    image: "calendar-nginx"
     working_dir: /var/www/
     depends_on:
       - php-fpm
@@ -63,16 +63,16 @@ services:
         target: /etc/nginx/conf.d/default.conf
         read_only: true
       - type: volume
-        source: scheduler-nginx-local
+        source: calendar-nginx-local
         target: /usr/share/nginx/html/
         read_only: false
     expose:
       - 80
       - 443
     networks:
-      - scheduler-network
+      - calendar-network
   elk:
-    container_name: "scheduler-elk"
+    container_name: "calendar-elk"
     image: elasticsearch:${ELK_VERSION}
     tty: true
     restart: unless-stopped
@@ -90,13 +90,13 @@ services:
       - 9300
     volumes:
       - type: volume
-        source: scheduler-elk-local
+        source: calendar-elk-local
         target: /usr/share/elasticsearch/data
         read_only: false
     networks:
-      - scheduler-network
+      - calendar-network
   database:
-    container_name: "scheduler-database"
+    container_name: "calendar-database"
     image: mysql:latest
     tty: true
     ulimits:
@@ -127,13 +127,13 @@ services:
         target: /var/run/docker.sock
         read_only: false
       - type: volume
-        source: scheduler-mysql-local
+        source: calendar-mysql-local
         target: /var/lib/mysql/
         read_only: false
     networks:
-      - scheduler-network
+      - calendar-network
   adminer:
-    container_name: "scheduler-adminer"
+    container_name: "calendar-adminer"
     image: adminer:latest
     tty: true
     restart: unless-stopped
@@ -142,18 +142,18 @@ services:
     expose:
       - 8080
     networks:
-      - scheduler-network
+      - calendar-network
 
 volumes:
-  scheduler-mysql-local:
+  calendar-mysql-local:
     driver: local
-  scheduler-php-fpm-local:
+  calendar-php-fpm-local:
     driver: local
-  scheduler-nginx-local:
+  calendar-nginx-local:
     driver: local
-  scheduler-elk-local:
+  calendar-elk-local:
     driver: local
 
 networks:
-  scheduler-network:
+  calendar-network:
     driver: bridge
