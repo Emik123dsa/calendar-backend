@@ -8,6 +8,6 @@ install:
 
 all:
 	docker-compose -f docker-compose.yml down --remove-orphans --volumes
-	docker-compose -f docker-compose.yml up -d --build --force-recreate
+	docker-compose -f docker-compose.yml up -d --force-recreate
 
 .PHONY: install

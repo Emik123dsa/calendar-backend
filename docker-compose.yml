@@ -14,8 +14,21 @@ services:
     depends_on:
       - database
     volumes:
-      - ".:/var/www/"
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - type: bind
+        source: .
+        target: /var/www/
+      - type: bind
+        source: ./docker/dev/php-fpm/xdebug.ini
+        target: /usr/local/etc/php/conf.d/xdebug.ini
+        read_only: true
+      - type: bind
+        source: ./docker/dev/php-fpm/opcache.ini
+        target: /usr/local/etc/php/conf.d/opcache.ini
+        read_only: true
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: false
     env_file:
       - .env
     restart: unless-stopped
@@ -26,7 +39,7 @@ services:
     tty: true
     image: "scheduler-nginx"
     working_dir: /var/www/
-    depends_on: 
+    depends_on:
       - php-fpm
       - database
     env_file:
@@ -38,32 +51,49 @@ services:
       - 80:80
       - 443:443
     volumes:
-      - ".:/var/www/"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "scheduler-nginx-local:/var/lib/nginx/"
+      - type: bind
+        source: .
+        target: /var/www
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: false
+      - type: bind
+        source: ./docker/dev/web/default.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+      - type: volume
+        source: scheduler-nginx-local
+        target: /usr/share/nginx/html/
+        read_only: false
     expose:
       - 80
       - 443
     networks:
       - scheduler-network
-  elasticsearch:
-    container_name: "scheduler-elasticsearch"
+  elk:
+    container_name: "scheduler-elk"
     image: elasticsearch:${ELK_VERSION}
     tty: true
     restart: unless-stopped
-    ports: 
+    ports:
       - 9200:9200
       - 9300:9300
-    env_file: 
+    env_file:
       - .env
-    environment: 
+    environment:
       ES_JAVA_OPTS: "-Xmx256m -Xms256m"
       ELASTIC_PASSWORD: ${ELK_PASSWORD}
       discovery.type: single-node
-    expose: 
+    expose:
       - 9200
       - 9300
-    networks: 
+    volumes:
+      - type: volume
+        source: scheduler-elk-local
+        target: /usr/share/elasticsearch/data
+        read_only: false
+    networks:
       - scheduler-network
   database:
     container_name: "scheduler-database"
@@ -76,7 +106,7 @@ services:
         hard: 262144
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD}"]
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
       timeout: 20s
       retries: 10
     environment:
@@ -92,18 +122,36 @@ services:
     expose:
       - 3306
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "scheduler-database-local:/var/lib/mysql/"
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: false
+      - type: volume
+        source: scheduler-mysql-local
+        target: /var/lib/mysql/
+        read_only: false
     networks:
       - scheduler-network
-  # elasticsearch:
+  adminer:
+    container_name: "scheduler-adminer"
+    image: adminer:latest
+    tty: true
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+    expose:
+      - 8080
+    networks:
+      - scheduler-network
 
 volumes:
-  scheduler-database-local:
+  scheduler-mysql-local:
     driver: local
   scheduler-php-fpm-local:
     driver: local
   scheduler-nginx-local:
+    driver: local
+  scheduler-elk-local:
     driver: local
 
 networks:

@@ -11,7 +11,7 @@ ENV PICKLE_INSTALLER "https://github.com/FriendsOfPHP/pickle/releases/download/v
 
 ENV LARAVEL_ENV "dev"
 
-ADD ${PHING_INSTALLER} /usr/local/bin/phing 
+ADD ${PHING_INSTALLER} /usr/local/bin/phing
 RUN chmod +x /usr/local/bin/phing && \
     chown -R www-data:www-data /usr/local/bin/phing
 
@@ -92,25 +92,26 @@ RUN echo "pm.start_servers=5" | tee -a /usr/local/etc/php-fpm.d/www.conf
 RUN echo "pm.min_spare_servers=5" | tee -a /usr/local/etc/php-fpm.d/www.conf
 RUN echo "pm.max_spare_servers=25" | tee -a /usr/local/etc/php-fpm.d/www.conf
 
-ADD docker/dev/php-fpm/*.ini /usr/local/etc/php/conf.d/
-
-RUN touch /tmp/xdebug.log
-RUN chmod a+rwx /tmp/xdebug.log
-
-ENV COMPOSER_ALLOW_SUPERUSER "1"
-ENV COMPOSER_HOME "/usr/local/bin/composer"
-ENV COMPOSER_VERSION "2.0.12"
+ADD docker/${LARAVEL_ENV}/php-fpm/*.ini /usr/local/etc/php/conf.d/
 
 RUN mkdir -p /var/www/
 RUN chown -R www-data:www-data /var/www/
 RUN chmod a+rwx /var/www/
 RUN usermod -u 1000 www-data
 
+RUN mkdir -p /var/www/tmp && touch /var/www/tmp/xdebug.log
+RUN chmod a+rwx /var/www/tmp/xdebug.log
+
+ENV COMPOSER_ALLOW_SUPERUSER "1"
+ENV COMPOSER_HOME "/usr/local/bin/composer"
+ENV COMPOSER_VERSION "2.0.12"
+
 WORKDIR /var/www/
 
 USER www-data
 
-EXPOSE 9000
+EXPOSE 9000/tcp
+
 STOPSIGNAL SIGTERM
 
 ENTRYPOINT ["php-fpm"]
